@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Server.Models;
+using WindowsFormsApplication.Helpers;
 
 namespace Proxy.Controllers
 {
@@ -7,12 +9,9 @@ namespace Proxy.Controllers
     [ApiController]
     public class ProxyController : ControllerBase
     {
+
+        public static readonly string ServerIp = "https://localhost:7134";
         [HttpGet("/health")]
-        public ActionResult<string> HealthCheck()
-        {
-            return Ok("Healthy");
-        }
-        [HttpGet("health")]
         public ActionResult<string> HealthCheck()
         {
             return Ok("Healthy");
@@ -21,35 +20,36 @@ namespace Proxy.Controllers
         [HttpGet("Player/Create/{name}/{ip}")]
         public ActionResult<string> CreateClient(string name, string ip)
         {
-            return _clientSessionFacade.AddClient(name, ip);
+            string serverUrl = $"{ServerIp}/Player/Create/{name}/{ip}";
+            HttpResponseMessage message = HttpRequests.GetRequest(serverUrl);
+            string value = message.Message();
+            if (message.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                return base.BadRequest(value);
+            return base.Created("", value);
         }
 
         [HttpDelete("Player/Unregister/{name}")]
         public ActionResult UnregisterClient(string name)
         {
-            return _clientSessionFacade.RemoveClient(name);
+            string serverUrl = $"{ServerIp}/Player/Unregister/{name}";
+            HttpRequests.DeleteRequest(serverUrl);
+            return NoContent();
         }
 
         [HttpGet("Player/SetAsReady/{name}")]
         public async Task<IActionResult> SetPlayerAsReady(string name)
         {
-            return _clientSessionFacade.SetClientReady(name);
-        }
-
-        [HttpGet("/Debug/StartGameSolo/{port}")]
-        public async Task<IActionResult> DebugStartSolo(string port)//Using this only to quickstart the game when debugging
-        {
-            CreateClient("0", port);
-            CreateClient("1", port);
-            Task.Run(() => _gameSession.StartGameDebug());
-
+            string serverUrl = $"{ServerIp}/Player/SetAsReady/{name}";
+            HttpRequests.GetRequest(serverUrl);
             return Ok();
         }
 
         [HttpGet("Game")]
         public ActionResult<Game> GetGameInfo()
         {
-            return Ok(_gameSession.GetGameDto());
+            string serverUrl = $"{ServerIp}/Game";
+            HttpResponseMessage httpResponseMessage = HttpRequests.GetRequest(serverUrl);
+            return Ok(httpResponseMessage.Deserialize<Game>());
         }
     }
 }
